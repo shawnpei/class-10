@@ -1,0 +1,224 @@
+---
+title: "Genome Arthimetic with valr" 
+author: Kent Riemondy RBI
+output:
+  html_document:
+    highlight: tango
+---
+
+## <img src="images/valr_logo.png" style="width: 80px;"/> Tutorial
+
+1) Introduce the `valr` package for performing genome arithmetic in R
+2) Review metagene analyses and ploting with `ggplot2`
+3) Introduce randomizing intervals for statistical analysis
+
+### philosophy behind valr 
+
+1) Promote fluid interactive analysis by limiting back-and-forth between
+   command line and R. 
+2) Empower data parsing/manipulating power of `dplyr` and
+   the `tidyverse` style of programming
+3) Encourage the use of RMarkdown and Shiny apps for reproducible and
+   accessible genomics analysis  
+
+### Installation
+
+```{r install, message = F, warning = F}    
+#install.packages('valr')
+library(valr)
+library(tidyverse)
+```
+
+### Documentation
+
+The `valr` package has extensive documentation that can be accessed via R's help interface.
+
+Alternatively, valr's [online documentation](http://rnabioco.github.io/valr) contains documentation for each function as well as examples and vignettes.  
+
+```{r help}
+?valr
+?read_bed
+?bed_intersect
+?bed_glyph
+```
+
+
+
+### Basic Usage
+
+1) read bed/bedgraph/vcf data into R as tbls
+   (`read_bed()`, `read_genome()`)
+2) all bed functions start with `bed_*()`
+   (`bed_intersect()`, `bed_map()`)
+3) Pass data via `%>%` 
+4) Execute arbitrary aggregating functions in summarizing operations similar to `mutate` or `summarize` in dplyr.
+   (`bed_map(x, y, my_custom_function(score)`)
+
+### Example
+
+```{r example_1, message = F, warning = F}
+library(valr)
+library(tidyverse)
+
+file_snps <- valr_example('hg19.snps147.chr22.bed.gz')
+file_genes <- valr_example('genes.hg19.chr22.bed.gz')
+
+snps <- read_bed(file_snps, n_fields = 6)
+genes <- read_bed(file_genes, n_fields = 6)
+
+# find snps in intergenic regions
+intergenic <- bed_subtract(snps, genes)
+# find distance from intergenic snps to nearest gene
+nearby <- bed_closest(intergenic, genes)
+
+# find snps within 5kbp of genes
+nearby %>%
+  select(starts_with('name'), .overlap, .dist) %>%
+    filter(abs(.dist) < 5000)
+```
+    
+## Grouping 
+
+valr functions respect groupings set by ``dplyr::group_by()``
+
+```{r group_by_strand}
+# to intersect by strand
+snps <- group_by(snps, strand)
+genes <- group_by(genes, strand)
+bed_intersect(snps, genes)
+```
+
+## Summaries by Column
+
+``valr`` functions accept named columns and permit mutiple name/value
+summaries 
+
+```{bash, eval = F}
+# calculate the mean of column 6 for intervals in `b` that overlap with `a`
+bedtools map -a a.bed -b b.bed -c 6 -o mean
+```
+
+```{r, eval = F}
+# calculate the mean and variance for a `value` column
+bed_map(a, b, .mean = mean(value), .var = var(value))
+    
+# report concatenated and max values for merged intervals
+bed_merge(a, .concat = concat(value), .max = max(value))
+```
+
+## Random functions
+
+`valr` and `bedtools` have a series of functions useful for generating
+background interval datasets for statistical tests
+
+```{r eval = F}   
+genome <- read_genome(valr_example("genome.txt.gz"))
+
+bed_random(genome) # random intervals of a fixed sized
+bed_shuffle(bed, genome) # randomly placed intervals of same input size
+bed_flank(bed, both = 100) # get flanking regions
+dplyr::sample_n() # get random rows 
+```
+
+## Fast Computation
+
+Computationally intensive functions in `valr` are written in `Rcpp/C++`,
+making `valr` fast enough for interactive analysis.
+
+```{r }
+genomefile <- valr_example('hg19.chrom.sizes.gz')
+genome <- read_genome(genomefile)
+x <- bed_random(genome) # generate 1e6 random 1kp ivls
+y <- bed_random(genome)
+bed_intersect(x, y) #should take ~1 second
+```
+
+## TSS Metagene Example
+
+Previously we used `bedtools` to examine the coverage of
+CTCF ChIP-Seq data over Transcription Start Sites. 
+
+A similar analysis can easily be performed with `dplyr` and `valr`
+
+See a detailed example using valr on [H3K4me3 ChIP-Seq](http://rnabioco.github.io/valr/articles/valr.html#meta-analysis)
+
+## Strategy
+
+1) Make TSS intervals
+2) Expand interval a distance around TSS
+3) Make windows for each desired data point
+4) Compute coverage across region around each TSS
+5) Summarize coverage across all TSS
+
+## Load data
+
+```{r load_data}
+# `valr_example()` identifies the path of example files
+bedfile <- valr_example('genes.hg19.chr22.bed.gz')
+genomefile <- valr_example('hg19.chrom.sizes.gz')
+bgfile  <- '~/src/MOLB7621/data-sets/bedtools/ctcf.hela.chr22.bg.gz'
+
+genes <- read_bed(bedfile, n_fields = 6)
+genome <- read_genome(genomefile)
+y <- read_bedgraph(bgfile)
+```
+
+## Make TSS intervals
+
+```{r, make_windows}
+    
+# generate 1 bp TSS intervals, `+` strand only
+tss <- genes %>%
+  filter(strand == '+') %>%
+  mutate(end = start + 1)
+
+region_size <- 1000 # 1000 bp up and downstream
+win_size <- 5  # 5 bp windows
+
+# add slop to the TSS, break into windows and add a group
+x <- tss %>%
+  bed_slop(genome, both = region_size) %>%
+  bed_makewindows(genome, win_size)
+x
+```
+
+## Compute and Summarize Coverage
+
+```{r map}
+# map signals to TSS regions and calculate summary statistics.
+res <- bed_map(x, y, win_mean = mean(value, na.rm = TRUE)) %>%
+  group_by(.win_id) %>%
+  summarize(win_sum = sum(win_mean, na.rm = TRUE))
+
+res
+```
+
+## Plot metagene
+
+```{r plot_it}
+library(ggplot2)
+
+x_labels <- seq(-region_size, region_size, by = win_size * 50)
+x_breaks <- seq(1, 401, by = 50)
+
+ggplot(res, aes(x = .win_id, y = win_sum)) +
+  geom_point() + 
+  scale_x_continuous(labels = x_labels, breaks = x_breaks) +
+  xlab('Position (bp from TSS)') + ylab('Signal') +
+  ggtitle('Human CTCF signal near transcription start sites') +
+  theme_classic()
+```
+
+## Exercises
+
+1. Use `valr` to generate a TSS metagene plot
+2. Add a second negative control line to the metagene from shuffled TSS regions (hint: shuffle TSS positions, combine data_frames with `bind_rows()`)
+3. Plot metagene with TSS's derived from both positive and negative strands (hint: reverse negative strand interval windows)
+
+## Contributing
+
+If you are interested please contribute feature requests, new code,
+documentation, or your ideas for analysis vignettes.
+
+https://github.com/rnabioco/valr
+
