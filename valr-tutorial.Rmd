@@ -8,18 +8,18 @@ output:
 
 ## <img src="images/valr_logo.png" style="width: 80px;"/> Tutorial
 
-1) Introduce the `valr` package for performing genome arithmetic in R
-2) Review metagene analyses and ploting with `ggplot2`
-3) Introduce randomizing intervals for statistical analysis
+1. Introduce the `valr` package for performing genome arithmetic in R  
+2. Review metagene analyses and ploting with `ggplot2`  
+3. Introduce randomizing intervals for statistical analysis  
 
 ### philosophy behind valr 
 
-1) Promote fluid interactive analysis by limiting back-and-forth between
-   command line and R. 
-2) Empower data parsing/manipulating power of `dplyr` and
-   the `tidyverse` style of programming
-3) Encourage the use of RMarkdown and Shiny apps for reproducible and
-   accessible genomics analysis  
+1. Promote fluid interactive analysis by limiting back-and-forth between
+   command line and R.  
+2. Empower data parsing/manipulating power of `dplyr` and
+   the `tidyverse` style of programming  
+3. Encourage the use of RMarkdown and Shiny apps for reproducible and
+   accessible genomics analysis   
 
 ### Installation
 
@@ -46,13 +46,11 @@ Alternatively, valr's [online documentation](http://rnabioco.github.io/valr) con
 
 ### Basic Usage
 
-1) read bed/bedgraph/vcf data into R as tbls
-   (`read_bed()`, `read_genome()`)
-2) all bed functions start with `bed_*()`
-   (`bed_intersect()`, `bed_map()`)
-3) Pass data via `%>%` 
-4) Execute arbitrary aggregating functions in summarizing operations similar to `mutate` or `summarize` in dplyr.
-   (`bed_map(x, y, my_custom_function(score)`)
+1. Read bed/bedgraph/vcf data into R as tbls (`read_bed()`, `read_genome()`)  
+2. All bed functions start with `bed_*()` (`bed_intersect()`, `bed_map()`)   
+3. Pass data via `%>%`   
+4. Execute arbitrary aggregating functions in summarizing operations similar to `mutate` or `summarize` in dplyr.
+   (`bed_map(x, y, my_custom_function(score)`)  
 
 ### Example
 
@@ -144,11 +142,11 @@ See a detailed example using valr on [H3K4me3 ChIP-Seq](http://rnabioco.github.i
 
 ## Strategy
 
-1) Make TSS intervals
-2) Expand interval a distance around TSS
-3) Make windows for each desired data point
-4) Compute coverage across region around each TSS
-5) Summarize coverage across all TSS
+1. Make TSS intervals  
+2. Expand interval a distance around TSS  
+3. Make windows for each desired data point  
+4. Compute coverage across region around each TSS  
+5. Summarize coverage across all TSS  
 
 ## Load data
 
